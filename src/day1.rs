@@ -2,34 +2,37 @@ use lib::*;
 
 fn main() {
     let mut io = Io::new();
-    let mut lines = vec![];
-    for _ in 0..1000 {
-        lines.push(io.chars());
+    let mut res1 = 0;
+    let mut res2 = 0;
+    for mut lio in io.line_io() {
+        let line = lio.read_all();
+        let digits = Io::from_string(line.clone()).regex::<U>(r"(\d)");
+        res1 += digits[0] * 10 + digits[digits.len() - 1];
+        let line2 = line
+            .replace("one", "one1one")
+            .replace("two", "two2two")
+            .replace("three", "three3three")
+            .replace("four", "four4four")
+            .replace("five", "five5five")
+            .replace("six", "six6six")
+            .replace("seven", "seven7seven")
+            .replace("eight", "eight8eight")
+            .replace("nine", "nine9nine");
+        let digits2 = Io::from_string(line2).regex::<U>(r"(\d)");
+        res2 += digits2[0] * 10 + digits2[digits2.len() - 1];
     }
-    let mut res = 0;
-    for line in lines {
-        let mut first = 123123132;
-        let mut last = 0;
-        for i in 0..line.len() {
-            if line[i].is_digit(10) {
-                if first == 123123132 {
-                    first = (line[i] as B - b'0') as U;
-                }
-                last = (line[i] as B - b'0') as U;
-            }
-        }
-        res += first * 10 + last;
-    }
-    w!(io, res);
+    wf!(io, "Part 1: {res1}");
+    wf!(io, "Part 2: {res2}");
 }
 
 mod lib {
     #![allow(dead_code)]
+    use regex::Regex;
     use std::{
         fmt::Display,
         io::{
-            stdin, stdout, BufRead, BufReader, BufWriter, Error, ErrorKind, Read, Stdin, Stdout,
-            Write,
+            stdin, stdout, BufRead, BufReader, BufWriter, Cursor, Error, ErrorKind, Read, Stdin,
+            Stdout, Write,
         },
         str::{from_utf8_unchecked, FromStr},
     };
@@ -45,16 +48,50 @@ mod lib {
         b == b' ' || b == b'\n' || b == b'\r' || b == b'\t' || b == b','
     }
 
-    pub struct Io {
-        input: BufReader<Stdin>,
-        output: BufWriter<Stdout>,
+    #[derive(Debug)]
+    pub struct Io<R, W>
+    where
+        R: Read,
+        W: Write,
+    {
+        input: BufReader<R>,
+        output: BufWriter<W>,
     }
 
-    impl Io {
-        pub fn new() -> Io {
-            let input = BufReader::new(stdin());
-            let output = BufWriter::new(stdout());
-            Io { input, output }
+    impl Io<&[u8], Stdout> {
+        #[allow(clippy::should_implement_trait)]
+        /// This function creates an io handler from a &str which can be used to make parsing easier.
+        pub fn from_str(input: &str) -> Io<&[u8], Stdout> {
+            Io {
+                input: BufReader::new(input.as_bytes()),
+                output: BufWriter::new(stdout()),
+            }
+        }
+        /// This function creates an io handler from a String which can be used to parse lines easier.
+        pub fn from_string(input: String) -> Io<Cursor<String>, Stdout> {
+            Io {
+                input: BufReader::new(Cursor::new(input)),
+                output: BufWriter::new(stdout()),
+            }
+        }
+    }
+
+    impl Io<Stdin, Stdout> {
+        /// This functions creates the default I/O handler using stdin and stdout as reader and writer.
+        pub fn new() -> Io<Stdin, Stdout> {
+            Io {
+                input: BufReader::new(stdin()),
+                output: BufWriter::new(stdout()),
+            }
+        }
+    }
+
+    impl<R: std::io::Read, W: std::io::Write> Io<R, W> {
+        pub fn with_reader_and_writer(reader: R, writer: W) -> Io<R, W> {
+            Io {
+                input: BufReader::new(reader),
+                output: BufWriter::new(writer),
+            }
         }
         pub fn r<T: FromStr>(&mut self) -> T {
             let buf = self
@@ -77,18 +114,61 @@ mod lib {
             }
             res.trim_end().to_string()
         }
+        pub fn read_all(&mut self) -> String {
+            let mut res = String::new();
+            unsafe { self.input.read_to_string(&mut res).unwrap_unchecked() };
+            res
+        }
+        pub fn read_char(&mut self) -> char {
+            self.input
+                .by_ref()
+                .bytes()
+                .map(|b| b.expect("could not read bytes in io read operation"))
+                .find(|&b| b != b' ' && b != b'\n' && b != b'\r' && b != b'\t' && b != b',')
+                .unwrap() as char
+        }
         pub fn chars(&mut self) -> Vec<char> {
             self.r::<String>().chars().collect()
         }
-        pub fn nums(self) -> Vec<I> {
-            self.input
-                .lines()
-                .map(|x| x.unwrap().parse::<I>().unwrap())
-                .collect()
-        }
-
         pub fn vec<T: FromStr>(&mut self, n: usize) -> Vec<T> {
             (0..n).map(|_| self.r::<T>()).collect()
+        }
+        pub fn line_io(&mut self) -> impl std::iter::Iterator<Item = Io<Cursor<String>, Stdout>> {
+            let file = self.read_all();
+            file.lines()
+                .map(move |line| Io::from_string(line.to_string()))
+                .collect::<Vec<Io<Cursor<String>, Stdout>>>()
+                .into_iter()
+        }
+        pub fn blocks(&mut self) -> Vec<Io<Cursor<String>, Stdout>> {
+            let file = self.read_all();
+            file.split("\n\n")
+                .map(move |line| Io::from_string(line.to_string()))
+                .collect::<Vec<Io<Cursor<String>, Stdout>>>()
+        }
+        pub fn nums<T: std::str::FromStr<Err = impl std::fmt::Debug>>(&mut self) -> Vec<T> {
+            let file = self.read_all();
+            let re = Regex::new(r"(-?\d+)").unwrap();
+            re.captures_iter(&file)
+                .map(|x| x.get(1).unwrap().as_str().parse::<T>().unwrap())
+                .collect::<Vec<T>>()
+        }
+        pub fn pnums<T: std::str::FromStr<Err = impl std::fmt::Debug>>(&mut self) -> Vec<T> {
+            let file = self.read_all();
+            let re = Regex::new(r"(\d+)").unwrap();
+            re.captures_iter(&file)
+                .map(|x| x.get(1).unwrap().as_str().parse::<T>().unwrap())
+                .collect::<Vec<T>>()
+        }
+        pub fn regex<T: std::str::FromStr<Err = impl std::fmt::Debug>>(
+            &mut self,
+            re: &str,
+        ) -> Vec<T> {
+            let file = self.read_all();
+            let re = Regex::new(re).unwrap();
+            re.captures_iter(&file)
+                .map(|x| x.get(1).unwrap().as_str().parse::<T>().unwrap())
+                .collect::<Vec<T>>()
         }
         pub fn w<T: Display>(&mut self, t: T) {
             unsafe { write!(&mut self.output, "{t}").unwrap_unchecked() };
