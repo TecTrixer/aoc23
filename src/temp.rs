@@ -1,211 +1,149 @@
-use lib::*;
-
-fn main() {
-    let mut io = Io::new();
-    // let t = r!(io, U);
-    // for _ in 0..t {}
-}
-
-mod lib {
-    #![allow(dead_code)]
-    use regex::Regex;
-    use std::{
-        fmt::Display,
-        io::{
-            stdin, stdout, BufRead, BufReader, BufWriter, Cursor, Error, ErrorKind, Read, Stdin,
-            Stdout, Write,
-        },
-        str::{from_utf8_unchecked, FromStr},
-    };
-
-    pub use std::collections::{HashMap, HashSet};
-
-    pub type U = usize;
-    pub type I = isize;
-    pub type F = f64;
-    pub type B = u8;
-
-    fn is_skip_char(&b: &u8) -> bool {
-        b == b' ' || b == b'\n' || b == b'\r' || b == b'\t' || b == b','
-    }
-
-    #[derive(Debug)]
-    pub struct Io<R, W>
-    where
-        R: Read,
-        W: Write,
-    {
-        input: BufReader<R>,
-        output: BufWriter<W>,
-    }
-
-    impl Io<&[u8], Stdout> {
-        #[allow(clippy::should_implement_trait)]
-        /// This function creates an io handler from a &str which can be used to make parsing easier.
-        pub fn from_str(input: &str) -> Io<&[u8], Stdout> {
-            Io {
-                input: BufReader::new(input.as_bytes()),
-                output: BufWriter::new(stdout()),
+/// lowprime sieve: linear, sieve, primes, divisor
+/// computes lp[i] where lp[i] is the lowest prime divisor of i and pr, where pr[i] is the i-th prime number
+/// C: O(n), R: nothing
+fn lp(n: U) {
+    let mut lp = vec![0; n + 1];
+    let mut pr = vec![];
+    for i in 2..=n {
+        if lp[i] == 0 {
+            lp[i] = i;
+            pr.push(i);
+        }
+        let mut j = 0;
+        while i * pr[j] <= n {
+            lp[i * pr[j]] = pr[j];
+            if pr[j] == lp[i] {
+                break;
             }
-        }
-        /// This function creates an io handler from a String which can be used to parse lines easier.
-        pub fn from_string(input: String) -> Io<Cursor<String>, Stdout> {
-            Io {
-                input: BufReader::new(Cursor::new(input)),
-                output: BufWriter::new(stdout()),
-            }
-        }
-    }
-
-    impl Io<Stdin, Stdout> {
-        /// This functions creates the default I/O handler using stdin and stdout as reader and writer.
-        pub fn new() -> Io<Stdin, Stdout> {
-            Io {
-                input: BufReader::new(stdin()),
-                output: BufWriter::new(stdout()),
-            }
-        }
-    }
-
-    impl<R: std::io::Read, W: std::io::Write> Io<R, W> {
-        pub fn with_reader_and_writer(reader: R, writer: W) -> Io<R, W> {
-            Io {
-                input: BufReader::new(reader),
-                output: BufWriter::new(writer),
-            }
-        }
-        pub fn r<T: FromStr>(&mut self) -> T {
-            let buf = self
-                .input
-                .by_ref()
-                .bytes()
-                .map(|x| unsafe { x.unwrap_unchecked() })
-                .skip_while(is_skip_char)
-                .take_while(|c| !is_skip_char(c))
-                .collect::<Vec<_>>();
-            unsafe { from_utf8_unchecked(&buf) }
-                .parse()
-                .map_err(|_| Error::new(ErrorKind::Other, "could not parse value"))
-                .unwrap()
-        }
-        pub fn read_line(&mut self) -> String {
-            let mut res = String::new();
-            unsafe {
-                self.input.read_line(&mut res).unwrap_unchecked();
-            }
-            res.trim_end().to_string()
-        }
-        pub fn read_all(&mut self) -> String {
-            let mut res = String::new();
-            unsafe { self.input.read_to_string(&mut res).unwrap_unchecked() };
-            res
-        }
-        pub fn read_char(&mut self) -> char {
-            self.input
-                .by_ref()
-                .bytes()
-                .map(|b| b.expect("could not read bytes in io read operation"))
-                .find(|&b| b != b' ' && b != b'\n' && b != b'\r' && b != b'\t' && b != b',')
-                .unwrap() as char
-        }
-        pub fn chars(&mut self) -> Vec<char> {
-            self.r::<String>().chars().collect()
-        }
-        pub fn vec<T: FromStr>(&mut self, n: usize) -> Vec<T> {
-            (0..n).map(|_| self.r::<T>()).collect()
-        }
-        pub fn line_io(&mut self) -> impl std::iter::Iterator<Item = Io<Cursor<String>, Stdout>> {
-            let file = self.read_all();
-            file.lines()
-                .map(move |line| Io::from_string(line.to_string()))
-                .collect::<Vec<Io<Cursor<String>, Stdout>>>()
-                .into_iter()
-        }
-        pub fn blocks(&mut self) -> Vec<Io<Cursor<String>, Stdout>> {
-            let file = self.read_all();
-            file.split("\n\n")
-                .map(move |line| Io::from_string(line.to_string()))
-                .collect::<Vec<Io<Cursor<String>, Stdout>>>()
-        }
-        pub fn nums<T: std::str::FromStr<Err = impl std::fmt::Debug>>(&mut self) -> Vec<T> {
-            let file = self.read_all();
-            let re = Regex::new(r"(-?\d+)").unwrap();
-            re.captures_iter(&file)
-                .map(|x| x.get(1).unwrap().as_str().parse::<T>().unwrap())
-                .collect::<Vec<T>>()
-        }
-        pub fn pnums<T: std::str::FromStr<Err = impl std::fmt::Debug>>(&mut self) -> Vec<T> {
-            let file = self.read_all();
-            let re = Regex::new(r"(\d+)").unwrap();
-            re.captures_iter(&file)
-                .map(|x| x.get(1).unwrap().as_str().parse::<T>().unwrap())
-                .collect::<Vec<T>>()
-        }
-        pub fn regex<T: std::str::FromStr<Err = impl std::fmt::Debug>>(
-            &mut self,
-            re: &str,
-        ) -> Vec<T> {
-            let file = self.read_all();
-            let re = Regex::new(re).unwrap();
-            re.captures_iter(&file)
-                .map(|x| x.get(1).unwrap().as_str().parse::<T>().unwrap())
-                .collect::<Vec<T>>()
-        }
-        pub fn w<T: Display>(&mut self, t: T) {
-            unsafe { write!(&mut self.output, "{t}").unwrap_unchecked() };
-        }
-        pub fn wl<T: Display>(&mut self, t: T) {
-            self.w(t);
-            self.nl();
-            self.flush();
-        }
-        pub fn nl(&mut self) {
-            self.w('\n');
-        }
-        pub fn flush(&mut self) {
-            unsafe { self.output.flush().unwrap_unchecked() }
-        }
-    }
-
-    #[macro_export]
-    macro_rules! wf {
-        ($io:expr, $($arg:tt)*) => {
-            $io.w(format!($($arg)*));
-            $io.nl();
-        };
-    }
-
-    #[macro_export]
-    macro_rules! w {
-        ($io:expr, $v:expr) => {
-            $io.w($v);$io.nl()
-        };
-        ($io:expr, $($v:expr);*, $l:expr) => {
-            $(
-                $io.w($v);
-                $io.w(' ');
-            )*
-            $io.w($l);
-            $io.nl()
-        };
-        ($io:expr, $($v:expr),*) => {
-            $(
-                $io.w($v);
-                $io.w(' ');
-            )*
-            $io.nl()
-        }
-    }
-
-    #[macro_export]
-    macro_rules! r {
-        ($io:expr, $T:ty) => {
-            $io.r::<$T>()
-        };
-        ($io:expr, $($T:ty),*) => {
-            ($(
-                $io.r::<$T>()
-            ),*)
+            j += 1;
         }
     }
 }
+
+/// parse graph, input parsing, undirected
+/// Parses the size and edges for an UNDIRECTED graph and generates the edge list
+/// assumes that indexes are 1-based
+/// R: io: Io
+let (n, m) = r!(io, U, U);
+let mut e = vec![vec![]; n];
+for _ in 0..m {
+    let (mut f, mut t) = r!(io, U, U);
+    f -= 1;
+    t -= 1;
+    e[f].push(t);
+    e[t].push(f);
+}
+
+/// DFS, graph, depth first search
+/// C: O(n + |e|), R: n: U, e: &Vec<Vec<U>>
+let start = 0;
+let mut v = vec![false; n];
+let mut p = vec![start; n];
+let mut s = vec![start];
+while let Some(i) = s.pop() {
+    if v[i] {
+        continue;
+    }
+    v[i] = true;
+    for &j in e[i].iter() {
+        if !v[j] {
+            p[j] = i;
+            s.push(j);
+        }
+    }
+}
+
+/// BFS, graph, breadth first search
+/// C: O(n + |e|), R: n: U, e: &Vec<Vec<U>>
+let start = 0;
+let mut v = vec![false; n];
+let mut p = vec![start; n];
+let mut s = std::collections::VecDeque::<U>::new();
+s.push_front(start);
+while let Some(i) = s.pop_front() {
+    if v[i] {
+        continue;
+    }
+    v[i] = true;
+    for &j in e[i].iter() {
+        if !v[j] {
+            p[j] = i;
+            s.push_back(j);
+        }
+    }
+}
+
+/// GCD, greatest common denominator
+/// C: O(log(min(a, b))), R: nothing
+fn gcd(mut a: U, mut b: U) -> U {
+    assert!(a != 0 && b != 0);
+    if b > a {
+        core::mem::swap(&mut a, &mut b);
+    }
+    let mut r = a % b;
+    while r > 0 {
+        a = b;
+        b = r;
+        r = a % b;
+    }
+    return b;
+}
+
+/// segment tree, range queries, configured for max
+/// can do: max, min, plus, times, xor, and, or
+/// C: O(n*log n), R: nothing
+#[inline(always)]
+fn id() -> U {
+    0
+}
+#[inline(always)]
+fn comb(a: U, b: U) -> U {
+    a.min(b)
+}
+struct SegTree {
+    buf: Vec<U>,
+}
+impl SegTree {
+    fn build(mut buf: Vec<U>) -> Self {
+        let n = buf.len();
+        buf.reserve_exact(n);
+        for i in 0..n {
+            buf.push(unsafe { *buf.get_unchecked(i) })
+        }
+        for i in (0..n).rev() {
+            buf[i] = comb(buf[i << 1], buf[i << 1 | 1]);
+        }
+        Self { buf }
+    }
+    fn query(&self, mut l: U, mut r: U) -> U {
+        let mut res = id();
+        l += self.buf.len() >> 1;
+        r += (self.buf.len() >> 1) + 1;
+        while l < r {
+            if l & 1 == 1 {
+                res = comb(res, self.buf[l]);
+                l += 1;
+            }
+            if r & 1 == 1 {
+                r -= 1;
+                res = comb(res, self.buf[r]);
+            }
+            l >>= 1;
+            r >>= 1;
+        }
+        res
+    }
+    fn modify(&mut self, mut idx: U, val: U) -> U {
+        idx += self.buf.len() >> 1;
+        let res = core::mem::replace(&mut self.buf[idx], val);
+        while {
+            idx >>= 1;
+            idx > 0
+        } {
+            self.buf[idx] = comb(self.buf[idx << 1], self.buf[idx << 1 | 1]);
+        }
+        res
+    }
+}
+
+

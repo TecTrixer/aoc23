@@ -8,7 +8,7 @@ alias t := test-day
 alias tr := test-release-day
 
 add-day day:
-	cp src/temp.rs src/day{{day}}.rs
+	cp src/day0.rs src/day{{day}}.rs
 	echo '[[bin]]\nname="day{{day}}"\npath="src/day{{day}}.rs"\n' >> Cargo.toml
 
 build-day day:
