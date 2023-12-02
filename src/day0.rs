@@ -2,8 +2,13 @@ use lib::*;
 
 fn main() {
     let mut io = Io::new();
-    // let t = r!(io, U);
-    // for _ in 0..t {}
+    // let mut res = 0;
+    // let mut res2 = 0;
+    // for mut lio in io.line_io() {
+
+    // }
+    // wf!(io, "Part 1: {res}");
+    // wf!(io, "Part 2: {res2}");
 }
 
 mod lib {
@@ -124,6 +129,12 @@ mod lib {
         pub fn blocks(&mut self) -> Vec<Io<Cursor<String>, Stdout>> {
             let file = self.read_all();
             file.split("\n\n")
+                .map(move |line| Io::from_string(line.to_string()))
+                .collect::<Vec<Io<Cursor<String>, Stdout>>>()
+        }
+        pub fn split(&mut self, pattern: &str) -> Vec<Io<Cursor<String>, Stdout>> {
+            let file = self.read_all();
+            file.split(pattern)
                 .map(move |line| Io::from_string(line.to_string()))
                 .collect::<Vec<Io<Cursor<String>, Stdout>>>()
         }
