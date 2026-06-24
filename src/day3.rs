@@ -42,12 +42,12 @@ fn main() {
                     }
                 }
             } else {
-                for gear in gears {
-                    adj.entry(gear)
+                for gear in gears.iter() {
+                    adj.entry(*gear)
                         .and_modify(|x| x.push(num as U))
                         .or_insert(vec![num as U]);
                 }
-                gears = HashSet::new();
+                gears.clear();
                 if valid {
                     res += num;
                 }
